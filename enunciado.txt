@@ -1,0 +1,26 @@
+
+O trabalho pode ser desenvolvido com o FreeRTOS, Zephyr, micropython ou rust/embassy. Alunos da engenharia de computação, preferencialmente usem um sistema diferente do visto em aula (FreeRTOS).
+
+1. Criar uma aplicação que tenha pelo menos uma tarefa de tempo real hard e e uma de tempo real soft.
+
+Exemplos de tarefa de tempo real hard realtime:
+- Calcular a FFT de um sinal de um canal do ADC (sinal gerado por gerador de sinal ou pelo DAC)
+- implementar um filtro digital em um sinal capturado pelo ADC e jogá-lo filtrado no DAC
+- controle de motor
+- aquisição de dados de um microfone e processamento de audio
+
+Exemplos de tarefa de tempo real soft realtime:
+- escrita ou leitura de cartão SD
+- envio de informações para uma nuvem
+- a própria tarefa do shell
+- atualização de uma tela gráfica
+- leitura periódica de sensores (temperatura, acelerometro, etc)
+
+2. Criar uma tarefa para o console/shell que permita o acesso às informações primárias do sistema (tarefas instaladas, heap livre e informações de runtime das tarefas). Crie também um comando para acessar informações com relação às tarefas de tempo real.
+
+3. Criar uma tarefa para piscar um led
+
+4. Criar uma tarefa que executa alguma função pelo clique do botão da placa utilizada.
+
+Todas as tarefas devem utilizar objetos do sistema operacional utilizado, não podendo existir polling no código de aplicação.
+
