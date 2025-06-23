@@ -33,7 +33,6 @@ static mut SYSTEM_STATS: TaskStats = TaskStats {
     led1_blinks: 0,
     led2_blinks: 0,
 };
-
 bind_interrupts!(struct Irqs {
     USART1 => embassy_stm32::usart::InterruptHandler<peripherals::USART1>;
 });
@@ -51,30 +50,10 @@ async fn console_shell(mut uart: Uart<'static, embassy_stm32::mode::Async>) {
     loop {
         match uart.read(&mut buffer[..1]).await {
             Ok(_) => {
-                let ch = buffer[0] as char;
-                
-                if ch == '\r' || ch == '\n' {
-                    let _ = uart.write(b"\r\n").await;
-                    
-                    if !cmd_buffer.is_empty() {
-                        process_command(&mut uart, &cmd_buffer).await;
-                        cmd_buffer.clear();
-                    }
-                    
-                    let _ = uart.write(b"> ").await;
-                } else if ch == '\x08' || ch == '\x7f' { 
-                    if !cmd_buffer.is_empty() {
-                        cmd_buffer.pop();
-                        let _ = uart.write(b"\x08 \x08").await; 
-                    }
-                } else if ch.is_ascii_graphic() || ch == ' ' {
-                    if cmd_buffer.push(ch).is_ok() {
-                        let _ = uart.write(&[ch as u8]).await; 
-                    }
-                }
+               
             }
             Err(_) => {
-                Timer::after_millis(10).await;
+
             }
         }
     }
@@ -95,83 +74,6 @@ async fn process_command(uart: &mut Uart<'static, embassy_stm32::mode::Async>, c
                  realtime    - Informacoes de tarefas tempo real\r\n\
                  reset       - Reset estatsticas\r\n"
             ));
-        }
-        "status" => {
-            let stats = unsafe { SYSTEM_STATS };
-            let _ = core::fmt::write(&mut response, format_args!(
-                "=== STATUS DO SISTEMA ===\r\n\
-                 Uptime: {} ms\r\n\
-                 Tarefas ativas: {}\r\n\
-                 Botão pressionado: {} vezes\r\n\
-                 LED1 piscou: {} vezes\r\n\
-                 LED2 piscou: {} vezes\r\n",
-                stats.uptime_ms, stats.task_count, stats.button_presses,
-                stats.led1_blinks, stats.led2_blinks
-            ));
-        }
-        "tasks" => {
-            let _ = core::fmt::write(&mut response, format_args!(
-                "=== TAREFAS INSTALADAS ===\r\n\
-                 1. blink_fast (LED1) - Perodo: 400ms\r\n\
-                 2. blink_slow (LED2) - Perodo: 2000ms\r\n\
-                 3. button_handler - Event-driven\r\n\
-                 4. console_shell - Event-driven\r\n\
-                 5. system_monitor - Perodo: 1000ms\r\n\
-                 6. main - Supervisão geral\r\n"
-            ));
-        }
-        "heap" => {
-            let _ = core::fmt::write(&mut response, format_args!(
-                "=== INFORMAcoES DE MEMoRIA ===\r\n\
-                 Sistema: no-std (sem heap dinâmico)\r\n\
-                 Stack: Gerenciado pelo Embassy\r\n\
-                 Memoria estática: Utilizada para tarefas e buffers\r\n\
-                 Status: OK - Sem vazamentos detectados\r\n"
-            ));
-        }
-        "runtime" => {
-            let stats = unsafe { SYSTEM_STATS };
-            let uptime_sec = stats.uptime_ms / 1000;
-            let uptime_sec = if uptime_sec == 0 { 1 } else { uptime_sec }; 
-            
-            let _ = core::fmt::write(&mut response, format_args!(
-                "=== RUNTIME DAS TAREFAS ===\r\n\
-                 Sistema ativo há: {} ms\r\n\
-                 LED1 (fast): ~{} execucoes/min\r\n\
-                 LED2 (slow): ~{} execucoes/min\r\n\
-                 Button: {} eventos processados\r\n\
-                 Console: Responsivo (event-driven)\r\n",
-                stats.uptime_ms,
-                (stats.led1_blinks * 60) / (uptime_sec as u32),
-                (stats.led2_blinks * 60) / (uptime_sec as u32),
-                stats.button_presses
-            ));
-        }
-        "realtime" => {
-            let _ = core::fmt::write(&mut response, format_args!(
-                "=== TAREFAS TEMPO REAL ===\r\n\
-                 blink_fast: Perodo determinstico 400ms\r\n\
-                 - Prioridade: Normal\r\n\
-                 - Jitter: < 1ms (Embassy scheduler)\r\n\
-                 - Deadline: Sempre atendido\r\n\
-                 \r\n\
-                 blink_slow: Perodo determinstico 2000ms\r\n\
-                 - Prioridade: Normal  \r\n\
-                 - Jitter: < 1ms\r\n\
-                 - Deadline: Sempre atendido\r\n\
-                 \r\n\
-                 button_handler: Event-driven RT\r\n\
-                 - Latência: < 50µs (EXTI)\r\n\
-                 - Prioridade: Alta (interrupção)\r\n"
-            ));
-        }
-        "reset" => {
-            unsafe {
-                SYSTEM_STATS.button_presses = 0;
-                SYSTEM_STATS.led1_blinks = 0;
-                SYSTEM_STATS.led2_blinks = 0;
-            }
-            let _ = core::fmt::write(&mut response, format_args!("Estatsticas resetadas!\r\n"));
         }
         _ => {
             let _ = core::fmt::write(&mut response, format_args!("Comando não encontrado. Digite 'help' para ajuda.\r\n"));
