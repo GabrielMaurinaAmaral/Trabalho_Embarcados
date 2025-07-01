@@ -1,4 +1,4 @@
-/*#![no_std]
+#![no_std]
 #![no_main]
 
 use defmt::*;
@@ -25,7 +25,7 @@ struct TaskStats {
     led1_blinks: u32,
     led2_blinks: u32,
 }
-
+static mut LEDSPEED: u32 = 200; // Velocidade do LED1 em milissegundos
 static mut SYSTEM_STATS: TaskStats = TaskStats {
     task_count: 0,
     uptime_ms: 0,
@@ -67,14 +67,29 @@ async fn console_shell(mut uart: Uart<'static, embassy_stm32::mode::Async>) {
 async fn process_command(uart: &mut Uart<'static, embassy_stm32::mode::Async>, cmd: &str) {
     let mut response = String::<512>::new();
     info!("Mensagem: {}", cmd);
-    match cmd.trim() {
-        "help" => {
-            // Já implementado
+    
+    if cmd.starts_with("led1=") {
+        if let Ok(valor) = cmd[5..].trim().parse::<u32>() {
+            unsafe { LEDSPEED = valor; }
+            let _ = core::fmt::write(&mut response, format_args!("Velocidade do LED1 ajustada para {} ms\r\n", valor));
+        } else {
+            let _ = core::fmt::write(&mut response, format_args!("Valor inválido!\r\n"));
         }
-        "status" => {
-            let stats = unsafe { SYSTEM_STATS };
+    }else{
+            match cmd.trim() {
+            "help" => {
             let _ = core::fmt::write(&mut response, format_args!(
-                "=== Status do Sistema ===\r\n\
+                "\n=== Comandos do Sistema ===\n\
+                 status\n\r\
+                 reset\n\r\
+                 help\n\r\
+                 led1=n (n velocidade desejada em ms)\n\r"
+            ));
+            }
+            "status" => {
+                let stats = unsafe { SYSTEM_STATS };
+                let _ = core::fmt::write(&mut response, format_args!(
+                "\n=== Status do Sistema ===\r\n\
                  Uptime: {} ms\r\n\
                  Tarefas ativas: {}\r\n\
                  Botão pressionado: {} vezes\r\n\
@@ -83,20 +98,24 @@ async fn process_command(uart: &mut Uart<'static, embassy_stm32::mode::Async>, c
                 stats.uptime_ms, stats.task_count, 
                 stats.button_presses, stats.led1_blinks, stats.led2_blinks
             ));
-        }
-        "reset" => {
-            unsafe {
-                SYSTEM_STATS.button_presses = 0;
-                SYSTEM_STATS.led1_blinks = 0;
-                SYSTEM_STATS.led2_blinks = 0;
             }
-            let _ = core::fmt::write(&mut response, format_args!("Estatísticas resetadas!\r\n"));
+            "reset" => {
+                unsafe {
+                    SYSTEM_STATS.button_presses = 0;
+                    SYSTEM_STATS.led1_blinks = 0;
+                    SYSTEM_STATS.led2_blinks = 0;
+                }
+                let _ = core::fmt::write(&mut response, format_args!("\nEstatísticas resetadas!\r\n"));
+            }
+        
+            _ => {
+                let _ = core::fmt::write(&mut response, format_args!("Comando não encontrado. Digite 'help' para ajuda.\r\n"));
+            }
         }
-        // Adicionar outros comandos...
-        _ => {
-            let _ = core::fmt::write(&mut response, format_args!("Comando não encontrado. Digite 'help' para ajuda.\r\n"));
-        }
+
     }
+
+    
     
     let _ = uart.write(response.as_bytes()).await;
     let _ = uart.write(b"\r\n> ").await;
@@ -107,10 +126,10 @@ async fn blink_fast(mut led: Output<'static>) {
     loop {
         led.set_high();
         info!("Led 1 aceso!");
-        Timer::after_millis(200).await;
+        Timer::after_millis(unsafe{LEDSPEED} as u64).await;
         led.set_low();
         info!("Led 1 apagado!");
-        Timer::after_millis(200).await;
+        Timer::after_millis(unsafe{LEDSPEED} as u64).await;
         
         unsafe {
             SYSTEM_STATS.led1_blinks += 1;
@@ -200,4 +219,4 @@ async fn main(spawner: Spawner) {
         Timer::after_secs(10).await;
         info!("Sistema em operação normal - {} tarefas ativas", unsafe { SYSTEM_STATS.task_count });
     }
-}*/
+}
