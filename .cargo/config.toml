@@ -1,5 +1,6 @@
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
 # runner = "probe-rs run --chip STM32F411CEUx"
+#runner = "sudo /home/rafael/.cargo/bin/probe-rs run --chip STM32F411CEUx"
 runner = "sudo /home/gabriel/.cargo/bin/probe-rs run --chip STM32F411CEUx"
 
 [build]
