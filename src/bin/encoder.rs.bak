@@ -18,7 +18,6 @@ use {defmt_rtt as _, panic_probe as _};
 
 // BUTTON_SIGNAL é um sinal para notificar eventos de botão
 static BUTTON_SIGNAL: Signal<ThreadModeRawMutex, ()> = Signal::new(); 
-static ENCODER_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 
 // Estrutura para armazenar estatísticas do sistema
@@ -111,10 +110,11 @@ async fn process_command(uart: &mut Uart<'static, embassy_stm32::mode::Async>, c
                  LED1 piscou: {} vezes\r\n\
                  LED2 piscou: {} vezes\r\n\
                  ADC Samples: {} vezes\r\n\
-                 Posição do peso: {}\r\n",
+                 Posição do peso: {}\r\n
+                 Pulsos do encoder: {}\r\n",
                 stats.uptime_ms, stats.task_count, 
                 stats.button_presses, stats.led1_blinks, stats.led2_blinks,
-                stats.adc_samples, stats.posicao
+                stats.adc_samples, stats.posicao, stats.pulsos
             ));
             }
             "reset" => {
@@ -244,12 +244,13 @@ async fn system_monitor() {
         info!("Monitor: Sistema ativo há {}s, {} amostras ADC", 
               uptime_s,
               unsafe { SYSTEM_STATS.adc_samples });
-        info!("Performance: {} amostras/s, {} botão, LEDs: {}/{}, Posicao: {}", 
+        info!("Performance: {} amostras/s, {} botão, LEDs: {}/{}, Posicao: {}, Pulsos: {}", 
               if uptime_s > 0 { unsafe { SYSTEM_STATS.adc_samples as u64 * 1000 / SYSTEM_STATS.uptime_ms } } else { 0 },
               unsafe { SYSTEM_STATS.button_presses },
               unsafe { SYSTEM_STATS.led1_blinks },
               unsafe { SYSTEM_STATS.led2_blinks },
-              unsafe { SYSTEM_STATS.posicao });
+              unsafe { SYSTEM_STATS.posicao },
+              unsafe { SYSTEM_STATS.pulsos });
     }
 }
 
@@ -266,7 +267,7 @@ async fn encoder_task(pin: peripherals::PA12, exti: peripherals::EXTI12) {
         
         // Conta apenas bordas de descida
         if last_level == Level::High && current_level == Level::Low {
-            ENCODER_COUNTER.fetch_add(1, Ordering::SeqCst);
+            unsafe {SYSTEM_STATS.pulsos += 1};
         }
         
         last_level = current_level;
@@ -275,27 +276,6 @@ async fn encoder_task(pin: peripherals::PA12, exti: peripherals::EXTI12) {
         Timer::after(Duration::from_micros(500)).await;
     }
 }
-
-#[embassy_executor::task]
-async fn display_task() {
-    loop {
-        Timer::after(Duration::from_secs(1)).await;
-        
-        let count = ENCODER_COUNTER.load(Ordering::SeqCst);
-        info!("Pulsos: {}", count);
-    }
-}
-
-// Função para acessar contador externamente
-pub fn get_encoder_count() -> u32 {
-    ENCODER_COUNTER.load(Ordering::SeqCst)
-}
-
-// Função para resetar contador
-pub fn reset_encoder_count() {
-    ENCODER_COUNTER.store(0, Ordering::SeqCst);
-}
-
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
