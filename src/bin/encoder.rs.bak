@@ -195,9 +195,9 @@ async fn adc_task(
 async fn blink_fast(mut led: Output<'static>) {
     loop {
         led.set_high();
-        Timer::after_millis(200).await;
+        Timer::after_millis(unsafe{LEDSPEED as u64}).await;
         led.set_low();
-        Timer::after_millis(200).await;
+        Timer::after_millis(unsafe{LEDSPEED as u64}).await;
         unsafe {
             SYSTEM_STATS.led1_blinks += 1;
         }
